@@ -105,7 +105,23 @@ impl Model<'_> {
         }
     }
 
+    /// Now and then the operator pauses, suspends or sets a minimum. None of
+    /// it may break an invariant or stop settlement.
+    fn operate(&self, rng: &mut Rng) {
+        match rng.below(40) {
+            0 if self.contract.paused() => self.contract.unpause(),
+            0 => self.contract.pause(),
+            1 => {
+                let m = &self.members[rng.below(self.members.len() as u64) as usize];
+                self.contract.set_suspended(m, &!self.contract.is_suspended(m));
+            }
+            2 => self.contract.set_min_amount(&self.tokens[rng.below(2) as usize], &(rng.below(40) as i128)),
+            _ => {}
+        }
+    }
+
     fn step(&mut self, rng: &mut Rng, step: usize) {
+        self.operate(rng);
         let m = self.members[rng.below(self.members.len() as u64) as usize].clone();
         let t = self.tokens[rng.below(2) as usize].clone();
         let before = self.state();
