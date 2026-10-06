@@ -276,6 +276,16 @@ fn require_member(env: &Env, who: &Address) {
     }
 }
 
+fn admit_one(env: &Env, member: Address) {
+    let key = Key::Member(member.clone());
+    if env.storage().persistent().has(&key) {
+        panic_with_error!(env, Error::AlreadyMember);
+    }
+    env.storage().persistent().set(&key, &true);
+    bump(env, &key);
+    Admitted { member }.publish(env);
+}
+
 /// A member that may take on new risk: admitted and not suspended.
 fn require_active(env: &Env, who: &Address) {
     require_member(env, who);
@@ -324,14 +334,20 @@ impl Settlement {
     /// Admits a member. Operator only.
     pub fn admit(env: Env, member: Address) {
         admin(&env).require_auth();
-        let key = Key::Member(member.clone());
-        if env.storage().persistent().has(&key) {
-            panic_with_error!(&env, Error::AlreadyMember);
-        }
-        env.storage().persistent().set(&key, &true);
-        bump(&env, &key);
+        admit_one(&env, member);
         touch(&env);
-        Admitted { member }.publish(&env);
+    }
+
+    /// Admits up to `MAX_BATCH` members at once, all or none. Operator only.
+    pub fn admit_many(env: Env, members: Vec<Address>) {
+        admin(&env).require_auth();
+        if members.is_empty() || members.len() > MAX_BATCH {
+            panic_with_error!(&env, Error::BadBatch);
+        }
+        for member in members.iter() {
+            admit_one(&env, member);
+        }
+        touch(&env);
     }
 
     /// Moves `amount` of `token` from the member into the contract as collateral.

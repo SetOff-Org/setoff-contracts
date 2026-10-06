@@ -402,3 +402,22 @@ fn anyone_can_keep_a_quiet_members_entries_alive() {
     // Unknown members and tokens are a no-op, not an error.
     w.contract.extend_ttl(&Address::generate(&w.env), &w.usdc);
 }
+
+#[test]
+fn members_can_be_admitted_in_one_batch() {
+    let w = World::new(0);
+    let fresh: std::vec::Vec<Address> = (0..3).map(|_| Address::generate(&w.env)).collect();
+    let mut batch = Vec::new(&w.env);
+    for m in &fresh {
+        batch.push_back(m.clone());
+    }
+    w.contract.admit_many(&batch);
+    assert!(fresh.iter().all(|m| w.contract.is_member(m)));
+
+    // All or none: one existing member rejects the whole batch.
+    let newcomer = Address::generate(&w.env);
+    let mixed = Vec::from_array(&w.env, [newcomer.clone(), fresh[0].clone()]);
+    assert_eq!(w.contract.try_admit_many(&mixed).unwrap_err().unwrap(), code(Error::AlreadyMember));
+    assert!(!w.contract.is_member(&newcomer));
+    assert_eq!(w.contract.try_admit_many(&Vec::new(&w.env)).unwrap_err().unwrap(), code(Error::BadBatch));
+}
