@@ -421,3 +421,16 @@ fn members_can_be_admitted_in_one_batch() {
     assert!(!w.contract.is_member(&newcomer));
     assert_eq!(w.contract.try_admit_many(&Vec::new(&w.env)).unwrap_err().unwrap(), code(Error::BadBatch));
 }
+
+#[test]
+fn withdraw_all_takes_exactly_what_is_free() {
+    let w = World::new(2);
+    w.deposit(0, 100);
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 30, 1)]));
+    assert_eq!(w.contract.withdraw_all(w.m(0), &w.usdc), 70);
+    assert_eq!(w.contract.balance(w.m(0), &w.usdc), 30, "the committed 30 stays");
+    assert_eq!(w.contract.withdraw_all(w.m(0), &w.usdc), 0, "nothing left to take");
+    w.contract.settle();
+    assert_eq!(w.contract.withdraw_all(w.m(1), &w.usdc), 30);
+    assert_eq!(TokenClient::new(&w.env, &w.usdc).balance(&w.contract.address), 0);
+}

@@ -385,6 +385,25 @@ impl Settlement {
         Withdrawn { member, token, amount }.publish(&env);
     }
 
+    /// Withdraws everything not committed to the open window and returns the
+    /// amount (0 if nothing is available), so callers need not read
+    /// `available` first and race a concurrent obligation.
+    pub fn withdraw_all(env: Env, member: Address, token: Address) -> i128 {
+        member.require_auth();
+        require_member(&env, &member);
+        let amount = available_of(&env, &member, &token);
+        if amount <= 0 {
+            return 0;
+        }
+        let key = Key::Balance(member.clone(), token.clone());
+        let balance = get_i128(&env, &key);
+        put_i128(&env, &key, balance.checked_sub(amount).unwrap_or_else(|| panic_with_error!(&env, Error::Overflow)));
+        token::Client::new(&env, &token).transfer(&env.current_contract_address(), &member, &amount);
+        touch(&env);
+        Withdrawn { member, token, amount }.publish(&env);
+        amount
+    }
+
     /// Records a batch of obligations in the open window, atomically.
     ///
     /// Every debtor must authorize. After the whole batch is applied, each
