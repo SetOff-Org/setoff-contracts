@@ -342,3 +342,28 @@ fn governance_changes_are_published() {
     assert_eq!(name, "admin_proposed");
     assert_eq!(topics.len(), 2, "both the current and proposed operator are topics");
 }
+
+#[test]
+fn a_suspended_member_takes_no_new_risk_but_keeps_its_money() {
+    let w = World::new(3);
+    w.deposit(0, 100);
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 40, 1)]));
+    w.contract.set_suspended(w.m(0), &true);
+    assert!(w.contract.is_suspended(w.m(0)));
+
+    let suspended = code(Error::Suspended);
+    assert_eq!(w.contract.try_deposit(w.m(0), &w.usdc, &1).unwrap_err().unwrap(), suspended);
+    assert_eq!(w.contract.try_submit(&w.batch(&[w.ob(0, 2, 1, 2)])).unwrap_err().unwrap(), suspended, "as debtor");
+    assert_eq!(w.contract.try_submit(&w.batch(&[w.ob(1, 0, 1, 3)])).unwrap_err().unwrap(), suspended, "as creditor");
+
+    // What it already owes still settles, and what is free can leave.
+    w.contract.withdraw(w.m(0), &w.usdc, &60);
+    w.contract.settle();
+    assert_eq!(w.contract.balance(w.m(0), &w.usdc), 0);
+    assert_eq!(w.contract.balance(w.m(1), &w.usdc), 40);
+
+    w.contract.set_suspended(w.m(0), &false);
+    w.deposit(0, 1);
+    let stranger = Address::generate(&w.env);
+    assert_eq!(w.contract.try_set_suspended(&stranger, &true), Err(Ok(code(Error::NotMember))));
+}

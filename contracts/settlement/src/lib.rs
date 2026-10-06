@@ -65,6 +65,8 @@ pub enum Error {
     TokenNotAllowed = 13,
     /// The window bound is outside `MAX_WINDOW_RANGE`.
     BadWindow = 14,
+    /// The member is suspended: no deposits or new obligations.
+    Suspended = 15,
 }
 
 /// One obligation in a `submit` batch.
@@ -98,6 +100,7 @@ enum Key {
     Gross(u64, Address),
     Reference(Address, BytesN<32>),
     Token(Address),
+    Suspended(Address),
 }
 
 /// A member was admitted.
@@ -192,6 +195,17 @@ pub struct AdminProposed {
     pub proposed: Address,
 }
 
+/// The operator suspended or reinstated a member.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SuspensionChanged {
+    /// The member.
+    #[topic]
+    pub member: Address,
+    /// Whether the member is now suspended.
+    pub suspended: bool,
+}
+
 /// The operator changed how long a window may stay open.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -250,6 +264,14 @@ fn require_member(env: &Env, who: &Address) {
     }
 }
 
+/// A member that may take on new risk: admitted and not suspended.
+fn require_active(env: &Env, who: &Address) {
+    require_member(env, who);
+    if env.storage().persistent().get(&Key::Suspended(who.clone())).unwrap_or(false) {
+        panic_with_error!(env, Error::Suspended);
+    }
+}
+
 fn admin(env: &Env) -> Address {
     env.storage().instance().get(&Key::Admin).unwrap_or_else(|| panic_with_error!(env, Error::NotMember))
 }
@@ -304,7 +326,7 @@ impl Settlement {
     pub fn deposit(env: Env, member: Address, token: Address, amount: i128) {
         member.require_auth();
         require_running(&env);
-        require_member(&env, &member);
+        require_active(&env, &member);
         require_token(&env, &token);
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
@@ -357,8 +379,8 @@ impl Settlement {
                 o.debtor.require_auth();
                 authorized.push_back(o.debtor.clone());
             }
-            require_member(&env, &o.debtor);
-            require_member(&env, &o.creditor);
+            require_active(&env, &o.debtor);
+            require_active(&env, &o.creditor);
             require_token(&env, &o.token);
             if o.amount <= 0 {
                 panic_with_error!(&env, Error::InvalidAmount);
@@ -507,6 +529,25 @@ impl Settlement {
         env.storage().instance().set(&Key::Paused, &false);
         touch(&env);
         PauseChanged { paused: false }.publish(&env);
+    }
+
+    /// Suspends or reinstates a member. A suspended member cannot deposit or
+    /// take part in new obligations, but its positions in the open window
+    /// still settle and its available balance can always be withdrawn.
+    /// Operator only.
+    pub fn set_suspended(env: Env, member: Address, suspended: bool) {
+        admin(&env).require_auth();
+        require_member(&env, &member);
+        let key = Key::Suspended(member.clone());
+        env.storage().persistent().set(&key, &suspended);
+        bump(&env, &key);
+        touch(&env);
+        SuspensionChanged { member, suspended }.publish(&env);
+    }
+
+    /// Whether a member is suspended.
+    pub fn is_suspended(env: Env, member: Address) -> bool {
+        env.storage().persistent().get(&Key::Suspended(member)).unwrap_or(false)
     }
 
     /// Whether the contract is paused.
