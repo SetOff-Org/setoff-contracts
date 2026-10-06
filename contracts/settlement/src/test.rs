@@ -367,3 +367,20 @@ fn a_suspended_member_takes_no_new_risk_but_keeps_its_money() {
     let stranger = Address::generate(&w.env);
     assert_eq!(w.contract.try_set_suspended(&stranger, &true), Err(Ok(code(Error::NotMember))));
 }
+
+#[test]
+fn open_positions_lists_the_non_zero_nets() {
+    let w = World::new(3);
+    w.deposit(0, 100);
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 50, 1), w.ob(1, 2, 50, 2)]));
+    // Member 1 received and paid 50: net zero, so not listed.
+    let positions = w.contract.open_positions();
+    assert_eq!(positions.len(), 2);
+    let net = |i: usize| positions.iter().find(|p| &p.member == w.m(i)).map(|p| p.net);
+    assert_eq!((net(0), net(1), net(2)), (Some(-50), None, Some(50)));
+    let total: i128 = positions.iter().map(|p| p.net).sum();
+    assert_eq!(total, 0, "positions always sum to zero");
+
+    w.contract.settle();
+    assert!(w.contract.open_positions().is_empty());
+}

@@ -85,6 +85,18 @@ pub struct Obligation {
     pub reference: BytesN<32>,
 }
 
+/// A member's net position in one token, as `open_positions` reports it.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Position {
+    /// The member.
+    pub member: Address,
+    /// The token.
+    pub token: Address,
+    /// Net: positive receives at settlement, negative pays.
+    pub net: i128,
+}
+
 #[contracttype]
 enum Key {
     Admin,
@@ -608,6 +620,22 @@ impl Settlement {
     /// Balance not committed to the open window: what can be withdrawn now.
     pub fn available(env: Env, member: Address, token: Address) -> i128 {
         available_of(&env, &member, &token)
+    }
+
+    /// Every non-zero position in the open window, in the order first touched.
+    /// Bounded by `MAX_POSITIONS`.
+    pub fn open_positions(env: Env) -> Vec<Position> {
+        let w = window(&env);
+        let pairs: Vec<(Address, Address)> =
+            env.storage().persistent().get(&Key::Positions(w)).unwrap_or_else(|| Vec::new(&env));
+        let mut out = Vec::new(&env);
+        for (member, token) in pairs.iter() {
+            let net = get_i128(&env, &Key::Net(w, member.clone(), token.clone()));
+            if net != 0 {
+                out.push_back(Position { member, token, net });
+            }
+        }
+        out
     }
 
     /// Gross obligations in the open window for a token.
