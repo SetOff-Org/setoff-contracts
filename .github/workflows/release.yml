@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: stellar/stellar-cli@v28.1.0
+      - run: stellar contract build
+        working-directory: contracts/settlement
+      - name: Name and hash the build
+        run: |
+          cp target/wasm32v1-none/release/setoff_settlement.wasm "setoff_settlement-${GITHUB_REF_NAME}.wasm"
+          sha256sum setoff_settlement-*.wasm > SHA256SUMS
+          cat SHA256SUMS
+      # Compare with a deployment: `stellar contract fetch --id C… | sha256sum`.
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            setoff_settlement-*.wasm
+            SHA256SUMS
+          generate_release_notes: true
