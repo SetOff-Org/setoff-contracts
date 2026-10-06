@@ -12,9 +12,12 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, BytesN, Env, Vec, contract, contracterror, contractevent, contractimpl, contracttype, panic_with_error,
-    token,
+    Address, BytesN, Env, Vec, contract, contracterror, contractevent, contractimpl, contractmeta, contracttype,
+    panic_with_error, token,
 };
+
+contractmeta!(key = "Description", val = "SetOff netted settlement: obligations accrue, only net positions move");
+contractmeta!(key = "Source", val = "https://github.com/SetOff-Org/setoff-contracts");
 
 /// Most (member, token) positions one window may touch, keeping `settle`
 /// within Soroban's per-transaction resource limits.
