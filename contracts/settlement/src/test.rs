@@ -434,3 +434,14 @@ fn withdraw_all_takes_exactly_what_is_free() {
     assert_eq!(w.contract.withdraw_all(w.m(1), &w.usdc), 30);
     assert_eq!(TokenClient::new(&w.env, &w.usdc).balance(&w.contract.address), 0);
 }
+
+#[test]
+fn a_minimum_amount_keeps_dust_out_of_the_window() {
+    let w = World::new(2);
+    w.deposit(0, 1_000);
+    w.contract.set_min_amount(&w.usdc, &100);
+    assert_eq!(w.contract.min_amount(&w.usdc), 100);
+    assert_eq!(w.contract.try_submit(&w.batch(&[w.ob(0, 1, 99, 1)])).unwrap_err().unwrap(), code(Error::BelowMinimum));
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 100, 2)]));
+    assert_eq!(w.contract.try_set_min_amount(&w.usdc, &-1).unwrap_err().unwrap(), code(Error::InvalidAmount));
+}

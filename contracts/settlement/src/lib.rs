@@ -67,6 +67,8 @@ pub enum Error {
     BadWindow = 14,
     /// The member is suspended: no deposits or new obligations.
     Suspended = 15,
+    /// The obligation is below the token's minimum amount.
+    BelowMinimum = 16,
 }
 
 /// One obligation in a `submit` batch.
@@ -113,6 +115,7 @@ enum Key {
     Reference(Address, BytesN<32>),
     Token(Address),
     Suspended(Address),
+    MinAmount(Address),
 }
 
 /// A member was admitted.
@@ -205,6 +208,17 @@ pub struct AdminProposed {
     /// Proposed operator.
     #[topic]
     pub proposed: Address,
+}
+
+/// The operator set a token's minimum obligation amount.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MinAmountChanged {
+    /// Token contract.
+    #[topic]
+    pub token: Address,
+    /// Smallest amount an obligation in this token may have.
+    pub amount: i128,
 }
 
 /// The operator suspended or reinstated a member.
@@ -432,6 +446,10 @@ impl Settlement {
             if o.amount <= 0 {
                 panic_with_error!(&env, Error::InvalidAmount);
             }
+            let min: i128 = env.storage().persistent().get(&Key::MinAmount(o.token.clone())).unwrap_or(0);
+            if o.amount < min {
+                panic_with_error!(&env, Error::BelowMinimum);
+            }
             if o.debtor == o.creditor {
                 panic_with_error!(&env, Error::SelfObligation);
             }
@@ -533,6 +551,26 @@ impl Settlement {
         bump(&env, &key);
         touch(&env);
         TokenAllowed { token, allowed }.publish(&env);
+    }
+
+    /// Sets the smallest amount an obligation in `token` may have. Positions
+    /// in a window are capped, so dust obligations could otherwise fill one
+    /// cheaply and lock everyone else out until it settles. Operator only.
+    pub fn set_min_amount(env: Env, token: Address, amount: i128) {
+        admin(&env).require_auth();
+        if amount < 0 {
+            panic_with_error!(&env, Error::InvalidAmount);
+        }
+        let key = Key::MinAmount(token.clone());
+        env.storage().persistent().set(&key, &amount);
+        bump(&env, &key);
+        touch(&env);
+        MinAmountChanged { token, amount }.publish(&env);
+    }
+
+    /// The smallest amount an obligation in `token` may have (0 if unset).
+    pub fn min_amount(env: Env, token: Address) -> i128 {
+        env.storage().persistent().get(&Key::MinAmount(token)).unwrap_or(0)
     }
 
     /// Whether a token may be used for new deposits and obligations.
