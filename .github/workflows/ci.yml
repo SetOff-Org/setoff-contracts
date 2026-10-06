@@ -32,6 +32,14 @@ jobs:
         working-directory: contracts/settlement
       - name: WASM size budget (64 KiB)
         run: test $(stat -c%s target/wasm32v1-none/release/setoff_settlement.wasm) -le 65536
+      # The contract spec must stay consumable from TypeScript.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: TypeScript bindings generate and compile
+        run: |
+          stellar contract bindings typescript --wasm target/wasm32v1-none/release/setoff_settlement.wasm --output-dir bindings --overwrite
+          cd bindings && npm install && npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: setoff_settlement.wasm
