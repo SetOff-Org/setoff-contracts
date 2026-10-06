@@ -460,3 +460,28 @@ fn used_references_can_be_looked_up() {
     assert!(w.contract.reference_used(w.m(0), &o.reference));
     assert_eq!(w.contract.try_submit(&w.batch(&[o])).unwrap_err().unwrap(), code(Error::DuplicateReference));
 }
+
+#[test]
+fn collateral_in_one_token_never_covers_another() {
+    let w = World::new(2);
+    let eurc = w.env.register_stellar_asset_contract_v2(Address::generate(&w.env)).address();
+    w.contract.set_token(&eurc, &true);
+    w.deposit(0, 1_000); // USDC only
+    let mut owes_eurc = w.ob(0, 1, 10, 1);
+    owes_eurc.token = eurc.clone();
+    assert_eq!(
+        w.contract.try_submit(&w.batch(&[owes_eurc])).unwrap_err().unwrap(),
+        code(Error::InsufficientCollateral)
+    );
+    // Netting is per token too: being owed EURC does not cover a USDC debit.
+    let mut owed_eurc = w.ob(1, 0, 500, 2);
+    owed_eurc.token = eurc;
+    StellarAssetClient::new(&w.env, &owed_eurc.token).mint(w.m(1), &500);
+    w.contract.deposit(w.m(1), &owed_eurc.token, &500);
+    w.contract.submit(&w.batch(&[owed_eurc]));
+    assert_eq!(
+        w.contract.try_submit(&w.batch(&[w.ob(1, 0, 10, 3)])).unwrap_err().unwrap(),
+        code(Error::InsufficientCollateral),
+        "member 1 holds no USDC"
+    );
+}
