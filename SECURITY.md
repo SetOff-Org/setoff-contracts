@@ -35,9 +35,10 @@ Trust in the operator, by design:
 
 Known limits:
 
-- A member can fill a window's 64 positions with small obligations, blocking
-  new obligations until the window settles. `set_min_amount` makes this costly
-  and `set_suspended` stops the member; a structural fix is open work.
+- Members acting together can still fill a window's 64 positions. Each
+  member's obligations may open at most `position_quota` new positions per
+  window (16 by default), so it takes at least four; `set_min_amount` makes it
+  costly and `set_suspended` stops them.
 - Only vetted tokens should be allowed: the contract calls the token's
   `transfer` on deposit and withdrawal and trusts its result.
 

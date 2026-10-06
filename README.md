@@ -52,10 +52,10 @@ deploys a fresh copy and replays this:
 | `withdraw(member, token, amount)`, `withdraw_all(member, token)` | member | Returns collateral not committed to the open window |
 | `submit(obligations)` | every debtor in the batch | Records up to 32 obligations atomically; rejects the batch if any debtor's net debit is uncovered |
 | `settle()` | operator, or anyone once the window is overdue | Applies every net position to balances and opens the next window |
-| `set_token`, `set_min_amount`, `set_max_window`, `set_suspended`, `pause`, `unpause` | operator | Operational controls; none can trap funds |
+| `set_token`, `set_min_amount`, `set_max_window`, `set_position_quota`, `set_suspended`, `pause`, `unpause` | operator | Operational controls; none can trap funds |
 | `propose_admin`, `accept_admin` | operator, then successor | Two-step handover |
 | `extend_ttl(member, token)` | anyone | Keeps a quiet member's entries from expiring |
-| `balance`, `position`, `available`, `open_positions`, `gross`, `window`, `window_timing`, `is_member`, `is_suspended`, `token_allowed`, `min_amount`, `reference_used`, `paused`, `admin` | anyone | Views |
+| `balance`, `position`, `available`, `open_positions`, `gross`, `window`, `window_timing`, `is_member`, `is_suspended`, `token_allowed`, `min_amount`, `position_quota`, `reference_used`, `paused`, `admin` | anyone | Views |
 
 Every state change publishes an event (`Admitted`, `Deposited`, `Withdrawn`,
 `Obligated`, `PositionSettled` per member and token, `Settled`, and one per
@@ -74,7 +74,9 @@ for comparison with `stellar contract fetch`. TypeScript bindings come from
   any window left open past its bound (1 minute to 30 days, never unset) can be
   settled by anyone.
 - **It fits in one transaction.** A window holds at most 64 (member, token)
-  positions and a batch at most 32 obligations. Measured against testnet's
+  positions and a batch at most 32 obligations; one member's obligations may
+  open at most 16 of those positions per window (`position_quota`), so no
+  single member can lock others out. Measured against testnet's
   limits, the largest settle uses 132 of 200 ledger writes and a full batch 11
   of 16 KB of events; a test fails if either passes 75%.
 - **Immutable.** There is no upgrade function: the operator cannot replace the

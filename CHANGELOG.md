@@ -26,6 +26,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- One member could fill a window's positions with dust obligations and lock
+  everyone else out until settlement; a per-member position quota now limits
+  each member to 16 new positions per window by default.
 - Windows had no default bound, so if the operator disappeared, collateral
   committed to the open window stayed locked. Windows now close permissionlessly
   after 7 days by default, and the bound cannot be unset.
