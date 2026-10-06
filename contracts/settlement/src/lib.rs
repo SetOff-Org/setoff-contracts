@@ -55,6 +55,8 @@ pub enum Error {
     Paused = 11,
     /// No operator handover is pending.
     NoPendingAdmin = 12,
+    /// The token has not been allowed by the operator.
+    TokenNotAllowed = 13,
 }
 
 /// One obligation in a `submit` batch.
@@ -85,6 +87,7 @@ enum Key {
     Positions(u64),
     Gross(u64, Address),
     Reference(Address, BytesN<32>),
+    Token(Address),
 }
 
 /// A member was admitted.
@@ -142,6 +145,17 @@ pub struct Obligated {
     pub reference: BytesN<32>,
     /// Window it belongs to.
     pub window: u64,
+}
+
+/// The operator allowed or disallowed a token.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenAllowed {
+    /// Token contract.
+    #[topic]
+    pub token: Address,
+    /// Whether new deposits and obligations may use it.
+    pub allowed: bool,
 }
 
 /// The operator role changed hands.
@@ -210,6 +224,12 @@ fn admin(env: &Env) -> Address {
     env.storage().instance().get(&Key::Admin).unwrap_or_else(|| panic_with_error!(env, Error::NotMember))
 }
 
+fn require_token(env: &Env, token: &Address) {
+    if !env.storage().persistent().get(&Key::Token(token.clone())).unwrap_or(false) {
+        panic_with_error!(env, Error::TokenNotAllowed);
+    }
+}
+
 fn require_running(env: &Env) {
     if env.storage().instance().get(&Key::Paused).unwrap_or(false) {
         panic_with_error!(env, Error::Paused);
@@ -253,6 +273,7 @@ impl Settlement {
         member.require_auth();
         require_running(&env);
         require_member(&env, &member);
+        require_token(&env, &token);
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
         }
@@ -306,6 +327,7 @@ impl Settlement {
             }
             require_member(&env, &o.debtor);
             require_member(&env, &o.creditor);
+            require_token(&env, &o.token);
             if o.amount <= 0 {
                 panic_with_error!(&env, Error::InvalidAmount);
             }
@@ -387,6 +409,25 @@ impl Settlement {
         touch(&env);
         Settled { window: w, positions: applied }.publish(&env);
         w
+    }
+
+    /// Allows or disallows a token for new deposits and obligations. Operator only.
+    ///
+    /// Only vetted tokens (for example Stellar Asset Contracts) should be
+    /// allowed: the contract calls the token's `transfer` on deposit and
+    /// withdrawal. Disallowing a token never blocks withdrawing it.
+    pub fn set_token(env: Env, token: Address, allowed: bool) {
+        admin(&env).require_auth();
+        let key = Key::Token(token.clone());
+        env.storage().persistent().set(&key, &allowed);
+        bump(&env, &key);
+        touch(&env);
+        TokenAllowed { token, allowed }.publish(&env);
+    }
+
+    /// Whether a token may be used for new deposits and obligations.
+    pub fn token_allowed(env: Env, token: Address) -> bool {
+        env.storage().persistent().get(&Key::Token(token)).unwrap_or(false)
     }
 
     /// Stops deposits and new obligations. Withdrawals of available funds and

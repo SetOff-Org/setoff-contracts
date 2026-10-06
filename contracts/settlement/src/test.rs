@@ -29,6 +29,7 @@ impl World<'_> {
         let id = env.register(Settlement, (&admin,));
         let contract = SettlementClient::new(&env, &id);
         let usdc = env.register_stellar_asset_contract_v2(Address::generate(&env)).address();
+        contract.set_token(&usdc, &true);
         let members = (0..members)
             .map(|_| {
                 let m = Address::generate(&env);
@@ -242,4 +243,21 @@ fn the_operator_role_changes_hands_in_two_steps() {
     assert_eq!(w.env.auths()[0].0, next, "acceptance is signed by the new operator");
     assert_eq!(w.contract.admin(), next);
     assert_eq!(w.contract.try_accept_admin().unwrap_err().unwrap(), code(Error::NoPendingAdmin));
+}
+
+#[test]
+fn only_allowed_tokens_can_be_deposited_or_owed() {
+    let w = World::new(2);
+    let other = w.env.register_stellar_asset_contract_v2(Address::generate(&w.env)).address();
+    StellarAssetClient::new(&w.env, &other).mint(w.m(0), &100);
+    assert!(!w.contract.token_allowed(&other));
+    assert_eq!(w.contract.try_deposit(w.m(0), &other, &10).unwrap_err().unwrap(), code(Error::TokenNotAllowed));
+    let mut ob = w.ob(0, 1, 1, 1);
+    ob.token = other.clone();
+    assert_eq!(w.contract.try_submit(&w.batch(&[ob])).unwrap_err().unwrap(), code(Error::TokenNotAllowed));
+
+    // Disallowing a token never traps it.
+    w.deposit(0, 50);
+    w.contract.set_token(&w.usdc, &false);
+    w.contract.withdraw(w.m(0), &w.usdc, &50);
 }
