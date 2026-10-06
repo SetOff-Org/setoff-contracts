@@ -26,21 +26,21 @@ hold, as long as it nets out, and `settle` can never fail for lack of funds.
 
 ## Deployed on testnet
 
-Contract [`CA7VZ3TF…CFFP`](https://stellar.expert/explorer/testnet/contract/CA7VZ3TFZMOZAK5CKLSEAG3CS3VMFCB6FXY2W6R4XUY53JAYUZFDCFFP),
+Contract [`CCW6QCOS…EYQV`](https://stellar.expert/explorer/testnet/contract/CCW6QCOSJTTJHDXJOVQ36NVIBAHBUVPMSZNOIJ3A444O6YMVHR4ZEYQV),
 using native XLM as the settlement token. [`scripts/testnet-demo.sh`](scripts/testnet-demo.sh)
 deploys a fresh copy and replays this:
 
 | Step | Transaction |
 |---|---|
-| Allow native XLM | [`1e6db7cf…6346`](https://stellar.expert/explorer/testnet/tx/1e6db7cf0931c50e1a4a184551e455ff1337556b11affc8fdedc4b0550016346) |
-| Admit A, B and C in one call | [`937c51af…e3aa`](https://stellar.expert/explorer/testnet/tx/937c51afca4502c5371e1f6d6b7525d9977d5988089b2a5411d8777a6d4be3aa) |
-| Refuse obligations below 1 XLM | [`f93267fe…1405`](https://stellar.expert/explorer/testnet/tx/f93267fed346caee615e3ccdbb1af42487f3293544063132e8cc531f92b91405) |
-| A deposits 10 XLM collateral | [`79bc9265…786c`](https://stellar.expert/explorer/testnet/tx/79bc9265c86cef9624dde2c1fec0a9f7b60aa2b48c3ecb86f686789fda0a786c) |
-| A owes B 10 XLM | [`176a5ea1…8095`](https://stellar.expert/explorer/testnet/tx/176a5ea1e4275e7e668c836e273c34ad4dbc14a254f726784f19c3bef0928095) |
-| B owes C 10 XLM with **no collateral**: B is already owed 10 this window | [`bfd62de6…afe3`](https://stellar.expert/explorer/testnet/tx/bfd62de64a50778bd683514282369de047d46ca4d87e1312688dd92559ebafe3) |
-| C owes A 10 XLM | [`87a6aa06…65e3`](https://stellar.expert/explorer/testnet/tx/87a6aa0698878aa1f0d3cd1bd4a336205799ef216e78bf4a53f864ea41d665e3) |
-| Settle: 30 XLM gross, every position 0, nothing moves | [`b968548c…944f`](https://stellar.expert/explorer/testnet/tx/b968548cd789dcf5a8559cede9a3356f68f7845d7ac39336a7743586b953944f) |
-| A takes its collateral back with `withdraw_all` | [`86b6049e…62da`](https://stellar.expert/explorer/testnet/tx/86b6049eda46c82a4d7b6d6ef309a3f43c4f605de66bde241d28f70e401062da) |
+| Allow native XLM | [`9060d30a…986b`](https://stellar.expert/explorer/testnet/tx/9060d30a4065041ab551df394abe43426218ca22d9e78755ddc20032498c986b) |
+| Admit A, B and C in one call | [`72deba3c…6dc2`](https://stellar.expert/explorer/testnet/tx/72deba3cfbf09f9c52a5d43a9b2d35761f4d5719153c15dfae77491a91336dc2) |
+| Refuse obligations below 1 XLM | [`5a16a3d1…d36e`](https://stellar.expert/explorer/testnet/tx/5a16a3d1e4f9536db4299f8145580c0093fb22953c0b02b4e1886bcd9214d36e) |
+| A deposits 10 XLM collateral | [`f39fb170…8a53`](https://stellar.expert/explorer/testnet/tx/f39fb170bb5eeb0f852dadee931e8d180bc90e452af1682533d0d73041688a53) |
+| A owes B 10 XLM | [`00bcc214…420e`](https://stellar.expert/explorer/testnet/tx/00bcc2141577ffc6b56caf97eaf25ac710f4028baf644eb5371a9d05a2f4420e) |
+| B owes C 10 XLM with **no collateral**: B is already owed 10 this window | [`14746e26…e6cd`](https://stellar.expert/explorer/testnet/tx/14746e268121e63aeb45e8455749c3d3e8e46aaa3aea91c017685effbd58e6cd) |
+| C owes A 10 XLM | [`555239b8…5297`](https://stellar.expert/explorer/testnet/tx/555239b878b3034683eaa8cba1e82393b53514b2f3f04371f31ce820f3a65297) |
+| Settle: 30 XLM gross, every position 0, nothing moves | [`21925e89…b89c`](https://stellar.expert/explorer/testnet/tx/21925e89bb1b75861880fe836e0ee3e1048cb23439569b5ab3d326ce06f2b89c) |
+| A takes its collateral back with `withdraw_all` | [`9d335065…dac9`](https://stellar.expert/explorer/testnet/tx/9d335065463faec6b4374ff28455a4e1b3fef99364eb32d578855a814a65dac9) |
 
 ## Interface
 
@@ -86,7 +86,7 @@ for comparison with `stellar contract fetch`. TypeScript bindings come from
 
 ```sh
 cargo test                 # unit, randomised-invariant and resource-limit tests
-stellar contract build     # target/wasm32v1-none/release/setoff_settlement.wasm, about 15 KB
+stellar contract build     # target/wasm32v1-none/release/setoff_settlement.wasm, about 23 KB
 NETWORK=testnet scripts/testnet-demo.sh
 ```
 
