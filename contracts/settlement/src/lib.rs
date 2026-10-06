@@ -647,4 +647,6 @@ impl Settlement {
 #[cfg(test)]
 mod invariants;
 #[cfg(test)]
+mod resources;
+#[cfg(test)]
 mod test;
