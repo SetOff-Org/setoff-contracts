@@ -485,3 +485,23 @@ fn collateral_in_one_token_never_covers_another() {
         "member 1 holds no USDC"
     );
 }
+
+#[test]
+fn settlement_reports_each_members_net() {
+    use soroban_sdk::xdr::{ContractEventBody, Int128Parts, ScVal};
+    let w = World::new(3);
+    w.deposit(0, 100);
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 70, 1), w.ob(0, 2, 30, 2)]));
+    w.contract.settle();
+    let mut nets = std::vec::Vec::new();
+    for e in w.env.events().all().events() {
+        let ContractEventBody::V0(body) = &e.body;
+        if body.topics.first() == Some(&ScVal::Symbol("position_settled".try_into().unwrap())) {
+            assert_eq!(body.topics.len(), 3, "name, member, token");
+            let ScVal::I128(Int128Parts { lo, hi }) = body.data else { panic!("net is a single i128") };
+            nets.push(((hi as i128) << 64) | lo as i128);
+        }
+    }
+    nets.sort();
+    assert_eq!(nets, [-100, 30, 70]);
+}

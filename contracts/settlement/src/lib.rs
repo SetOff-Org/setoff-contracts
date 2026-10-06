@@ -251,6 +251,22 @@ pub struct PauseChanged {
     pub paused: bool,
 }
 
+/// Settlement applied a member's net position to its balance. Emitted just
+/// before the window's `Settled` event, which names the window. Kept to a
+/// single value so a full window's worth fits the event budget.
+#[contractevent(data_format = "single-value")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PositionSettled {
+    /// The member.
+    #[topic]
+    pub member: Address,
+    /// The token.
+    #[topic]
+    pub token: Address,
+    /// Net applied: positive credited, negative debited.
+    pub net: i128,
+}
+
 /// A window was settled.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -528,9 +544,10 @@ impl Settlement {
             env.storage().persistent().remove(&net_key);
             env.storage().persistent().remove(&Key::Gross(w, token.clone()));
             if net != 0 {
-                let key = Key::Balance(member, token);
+                let key = Key::Balance(member.clone(), token.clone());
                 put_i128(&env, &key, add(&env, get_i128(&env, &key), net));
                 applied = applied.saturating_add(1);
+                PositionSettled { member, token, net }.publish(&env);
             }
         }
         env.storage().persistent().remove(&positions_key);
