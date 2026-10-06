@@ -288,3 +288,29 @@ fn early_settlement_still_needs_the_operator() {
     w.contract.settle();
     assert_eq!(w.env.auths()[0].0, w.admin);
 }
+
+#[test]
+fn committed_collateral_is_never_stuck_without_the_operator() {
+    // The operator never configures anything and then disappears.
+    let w = World::new(2);
+    w.deposit(0, 100);
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 100, 1)]));
+    assert_eq!(w.contract.available(w.m(0), &w.usdc), 0);
+
+    let (opened, max) = w.contract.window_timing();
+    assert!(max > 0, "a fresh contract must already bound how long a window stays open");
+    w.env.ledger().with_mut(|l| l.timestamp = opened + max);
+    w.env.mock_auths(&[]); // nobody signs
+    w.contract.settle();
+    assert_eq!(w.contract.balance(w.m(1), &w.usdc), 100);
+}
+
+#[test]
+fn the_window_bound_cannot_be_disabled() {
+    let w = World::new(1);
+    for seconds in [0u64, 59, 31 * 24 * 3_600] {
+        assert_eq!(w.contract.try_set_max_window(&seconds), Err(Ok(code(Error::BadWindow))), "{seconds}");
+    }
+    w.contract.set_max_window(&3_600);
+    assert_eq!(w.contract.window_timing().1, 3_600);
+}
