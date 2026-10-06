@@ -37,6 +37,12 @@ jobs:
           name: setoff_settlement.wasm
           path: target/wasm32v1-none/release/setoff_settlement.wasm
 
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
   hygiene:
     runs-on: ubuntu-latest
     steps:
