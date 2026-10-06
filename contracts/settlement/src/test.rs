@@ -314,3 +314,31 @@ fn the_window_bound_cannot_be_disabled() {
     w.contract.set_max_window(&3_600);
     assert_eq!(w.contract.window_timing().1, 3_600);
 }
+
+/// Name (first topic) and topic/data values of the last event published.
+fn last_event(env: &Env) -> (std::string::String, std::vec::Vec<soroban_sdk::xdr::ScVal>, soroban_sdk::xdr::ScVal) {
+    use soroban_sdk::xdr::{ContractEventBody, ScVal};
+    let events = env.events().all();
+    let e = events.events().last().expect("no events").clone();
+    let ContractEventBody::V0(body) = e.body;
+    let mut topics: std::vec::Vec<ScVal> = body.topics.to_vec();
+    let ScVal::Symbol(name) = topics.remove(0) else { panic!("first topic is not a symbol") };
+    (name.to_utf8_string_lossy(), topics, body.data)
+}
+
+#[test]
+fn governance_changes_are_published() {
+    use soroban_sdk::xdr::{ScMapEntry, ScVal};
+    let w = World::new(1);
+    w.contract.set_max_window(&7_200);
+    let (name, _, data) = last_event(&w.env);
+    assert_eq!(name, "max_window_changed");
+    let ScVal::Map(Some(map)) = data else { panic!("data is not a map") };
+    assert!(map.iter().any(|ScMapEntry { val, .. }| *val == ScVal::U64(7_200)), "{map:?}");
+
+    let next = Address::generate(&w.env);
+    w.contract.propose_admin(&next);
+    let (name, topics, _) = last_event(&w.env);
+    assert_eq!(name, "admin_proposed");
+    assert_eq!(topics.len(), 2, "both the current and proposed operator are topics");
+}

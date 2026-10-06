@@ -180,6 +180,26 @@ pub struct AdminChanged {
     pub admin: Address,
 }
 
+/// The operator proposed a successor, who must accept to take over.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposed {
+    /// Current operator.
+    #[topic]
+    pub admin: Address,
+    /// Proposed operator.
+    #[topic]
+    pub proposed: Address,
+}
+
+/// The operator changed how long a window may stay open.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaxWindowChanged {
+    /// New bound, in seconds.
+    pub seconds: u64,
+}
+
 /// The operator paused or resumed the contract.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -460,6 +480,7 @@ impl Settlement {
         }
         env.storage().instance().set(&Key::MaxWindow, &seconds);
         touch(&env);
+        MaxWindowChanged { seconds }.publish(&env);
     }
 
     /// When the open window opened (unix seconds) and its maximum duration.
@@ -496,9 +517,11 @@ impl Settlement {
     /// Proposes a new operator. Takes effect only when the new operator calls
     /// `accept_admin`, so a mistyped address can never lock the contract.
     pub fn propose_admin(env: Env, new_admin: Address) {
-        admin(&env).require_auth();
+        let current = admin(&env);
+        current.require_auth();
         env.storage().instance().set(&Key::PendingAdmin, &new_admin);
         touch(&env);
+        AdminProposed { admin: current, proposed: new_admin }.publish(&env);
     }
 
     /// Completes a handover proposed with `propose_admin`. The proposed operator only.
