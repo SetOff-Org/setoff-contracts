@@ -12,7 +12,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, BytesN, Env, Vec, contract, contracterror, contractevent, contractimpl, contractmeta, contracttype,
+    Address, BytesN, Env, Map, Vec, contract, contracterror, contractevent, contractimpl, contractmeta, contracttype,
     panic_with_error, token,
 };
 
@@ -24,6 +24,11 @@ contractmeta!(key = "Source", val = "https://github.com/SetOff-Org/setoff-contra
 pub const MAX_POSITIONS: u32 = 64;
 /// Most obligations in one `submit` call.
 pub const MAX_BATCH: u32 = 32;
+
+/// Default number of new positions one member's obligations may open in a
+/// window. A window holds `MAX_POSITIONS`, so filling it takes at least
+/// `MAX_POSITIONS / quota` members acting together.
+pub const DEFAULT_POSITION_QUOTA: u32 = 16;
 
 /// Default bound on how long a window stays open before anyone may settle it.
 pub const DEFAULT_MAX_WINDOW: u64 = 7 * 24 * 3_600;
@@ -72,6 +77,10 @@ pub enum Error {
     Suspended = 15,
     /// The obligation is below the token's minimum amount.
     BelowMinimum = 16,
+    /// The debtor has opened its quota of new positions in this window.
+    PositionQuota = 17,
+    /// The position quota is outside 1..=`MAX_POSITIONS`.
+    BadQuota = 18,
 }
 
 /// One obligation in a `submit` batch.
@@ -119,6 +128,8 @@ enum Key {
     Token(Address),
     Suspended(Address),
     MinAmount(Address),
+    PositionQuota,
+    Opened(u64, Address),
 }
 
 /// A member was admitted.
@@ -224,6 +235,14 @@ pub struct MinAmountChanged {
     pub amount: i128,
 }
 
+/// The operator changed the per-member position quota.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PositionQuotaChanged {
+    /// New positions one member may open per window.
+    pub quota: u32,
+}
+
 /// The operator suspended or reinstated a member.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -307,6 +326,13 @@ fn require_member(env: &Env, who: &Address) {
     if !env.storage().persistent().has(&Key::Member(who.clone())) {
         panic_with_error!(env, Error::NotMember);
     }
+}
+
+/// Ledgers a position-quota counter lives: a little over 30 days.
+const OPENED_TTL: u32 = 31 * DAY;
+
+fn position_quota(env: &Env) -> u32 {
+    env.storage().instance().get(&Key::PositionQuota).unwrap_or(DEFAULT_POSITION_QUOTA)
 }
 
 fn admit_one(env: &Env, member: Address) {
@@ -453,6 +479,8 @@ impl Settlement {
             env.storage().persistent().get(&positions_key).unwrap_or_else(|| Vec::new(&env));
         let mut debtors: Vec<(Address, Address)> = Vec::new(&env);
         let mut authorized: Vec<Address> = Vec::new(&env);
+        // New positions each debtor opens in this batch, checked against its quota.
+        let mut opened: Map<Address, u32> = Map::new(&env);
 
         for o in obligations.iter() {
             if !authorized.contains(&o.debtor) {
@@ -487,6 +515,8 @@ impl Settlement {
                         panic_with_error!(&env, Error::WindowFull);
                     }
                     positions.push_back(pair);
+                    let n = opened.get(o.debtor.clone()).unwrap_or(0);
+                    opened.set(o.debtor.clone(), n.saturating_add(1));
                 }
                 let key = Key::Net(w, member.clone(), o.token.clone());
                 put_i128(&env, &key, add(&env, get_i128(&env, &key), delta));
@@ -513,6 +543,17 @@ impl Settlement {
             if available_of(&env, &debtor, &token) < 0 {
                 panic_with_error!(&env, Error::InsufficientCollateral);
             }
+        }
+        let quota = position_quota(&env);
+        for (debtor, n) in opened.iter() {
+            let key = Key::Opened(w, debtor);
+            let total = env.storage().temporary().get::<_, u32>(&key).unwrap_or(0).saturating_add(n);
+            if total > quota {
+                panic_with_error!(&env, Error::PositionQuota);
+            }
+            env.storage().temporary().set(&key, &total);
+            // Outlive the longest window; an expired counter only resets a quota.
+            env.storage().temporary().extend_ttl(&key, OPENED_TTL, OPENED_TTL);
         }
         env.storage().persistent().set(&positions_key, &positions);
         bump(&env, &positions_key);
@@ -586,6 +627,23 @@ impl Settlement {
         bump(&env, &key);
         touch(&env);
         MinAmountChanged { token, amount }.publish(&env);
+    }
+
+    /// Sets how many new positions one member's obligations may open per
+    /// window, within 1..=`MAX_POSITIONS`. Operator only.
+    pub fn set_position_quota(env: Env, quota: u32) {
+        admin(&env).require_auth();
+        if quota == 0 || quota > MAX_POSITIONS {
+            panic_with_error!(&env, Error::BadQuota);
+        }
+        env.storage().instance().set(&Key::PositionQuota, &quota);
+        touch(&env);
+        PositionQuotaChanged { quota }.publish(&env);
+    }
+
+    /// New positions one member's obligations may open per window.
+    pub fn position_quota(env: Env) -> u32 {
+        position_quota(&env)
     }
 
     /// The smallest amount an obligation in `token` may have (0 if unset).

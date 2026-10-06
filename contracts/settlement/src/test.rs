@@ -183,6 +183,7 @@ fn invalid_obligations_are_rejected() {
 fn windows_are_bounded() {
     let w = World::new(MAX_POSITIONS as usize + 2);
     w.deposit(0, 1_000_000);
+    w.contract.set_position_quota(&MAX_POSITIONS); // one debtor may use the whole window here
     let mut tag = 0u8;
     for creditor in 1..MAX_POSITIONS as usize {
         tag = tag.wrapping_add(1);
@@ -509,4 +510,26 @@ fn settlement_reports_each_members_net() {
     }
     nets.sort();
     assert_eq!(nets, [-100, 30, 70]);
+}
+
+#[test]
+fn one_member_cannot_claim_the_whole_window() {
+    let w = World::new(4);
+    w.deposit(0, 1_000);
+    w.deposit(1, 1_000);
+    assert_eq!(w.contract.position_quota(), crate::DEFAULT_POSITION_QUOTA);
+    w.contract.set_position_quota(&2);
+    // A's obligation to B opens two positions: A's and B's.
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 1, 1)]));
+    // A third new position on A's account is over quota...
+    assert_eq!(w.contract.try_submit(&w.batch(&[w.ob(0, 2, 1, 2)])).unwrap_err().unwrap(), code(Error::PositionQuota));
+    // ...but existing positions are free, and B has its own quota.
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 1, 3)]));
+    w.contract.submit(&w.batch(&[w.ob(1, 2, 1, 4)]));
+    // Settlement gives everyone a fresh quota.
+    w.contract.settle();
+    w.contract.submit(&w.batch(&[w.ob(0, 3, 1, 5)]));
+    for bad in [0u32, crate::MAX_POSITIONS + 1] {
+        assert_eq!(w.contract.try_set_position_quota(&bad).unwrap_err().unwrap(), code(Error::BadQuota));
+    }
 }
