@@ -562,6 +562,20 @@ impl Settlement {
         env.storage().persistent().get(&Key::Suspended(member)).unwrap_or(false)
     }
 
+    /// Extends the lifetime of a member's membership and balance entries,
+    /// and the contract's own. Anyone may call it, e.g. a keeper for members
+    /// that hold funds without trading, whose entries would otherwise expire
+    /// and need restoring.
+    pub fn extend_ttl(env: Env, member: Address, token: Address) {
+        let storage = env.storage().persistent();
+        for key in [Key::Member(member.clone()), Key::Balance(member, token)] {
+            if storage.has(&key) {
+                bump(&env, &key);
+            }
+        }
+        touch(&env);
+    }
+
     /// Whether the contract is paused.
     pub fn paused(env: Env) -> bool {
         env.storage().instance().get(&Key::Paused).unwrap_or(false)

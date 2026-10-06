@@ -2,6 +2,7 @@
 
 extern crate std;
 
+use soroban_sdk::testutils::storage::Persistent as _;
 use soroban_sdk::testutils::{Address as _, AuthorizedFunction, Events as _, Ledger as _};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{Address, BytesN, Env, Vec};
@@ -383,4 +384,21 @@ fn open_positions_lists_the_non_zero_nets() {
 
     w.contract.settle();
     assert!(w.contract.open_positions().is_empty());
+}
+
+#[test]
+fn anyone_can_keep_a_quiet_members_entries_alive() {
+    let w = World::new(1);
+    w.deposit(0, 10);
+    let balance = crate::Key::Balance(w.m(0).clone(), w.usdc.clone());
+    let ttl = || w.env.as_contract(&w.contract.address, || w.env.storage().persistent().get_ttl(&balance));
+    let start = ttl();
+    // Some weeks pass with no activity: the entry ages.
+    w.env.ledger().with_mut(|l| l.sequence_number += 25 * 17_280);
+    assert!(ttl() < start - 20 * 17_280);
+    w.env.mock_auths(&[]);
+    w.contract.extend_ttl(w.m(0), &w.usdc);
+    assert!(ttl() >= 30 * 17_280 - 1, "extended to the full horizon");
+    // Unknown members and tokens are a no-op, not an error.
+    w.contract.extend_ttl(&Address::generate(&w.env), &w.usdc);
 }
