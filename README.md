@@ -55,11 +55,14 @@ deploys a fresh copy and replays this:
 | `set_token`, `set_min_amount`, `set_max_window`, `set_suspended`, `pause`, `unpause` | operator | Operational controls; none can trap funds |
 | `propose_admin`, `accept_admin` | operator, then successor | Two-step handover |
 | `extend_ttl(member, token)` | anyone | Keeps a quiet member's entries from expiring |
-| `balance`, `position`, `available`, `open_positions`, `gross`, `window`, `window_timing`, `is_member`, `is_suspended`, `token_allowed`, `min_amount`, `paused`, `admin` | anyone | Views |
+| `balance`, `position`, `available`, `open_positions`, `gross`, `window`, `window_timing`, `is_member`, `is_suspended`, `token_allowed`, `min_amount`, `reference_used`, `paused`, `admin` | anyone | Views |
 
 Every state change publishes an event (`Admitted`, `Deposited`, `Withdrawn`,
-`Obligated`, `Settled`, and one per operator action), so indexers never need to
-poll. Settlement receipts can be proven to third parties with
+`Obligated`, `PositionSettled` per member and token, `Settled`, and one per
+operator action), so members can reconcile from events alone. The contract's
+metadata names this repository, and releases publish the WASM with its SHA-256
+for comparison with `stellar contract fetch`. TypeScript bindings come from
+`stellar contract bindings typescript`; CI checks they compile. Settlement receipts can be proven to third parties with
 [Externalize](https://github.com/Externalize-Labs/externalize).
 
 ## Guarantees
