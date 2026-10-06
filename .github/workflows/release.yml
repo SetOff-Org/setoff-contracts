@@ -11,7 +11,7 @@ jobs:
   wasm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: stellar/stellar-cli@v28.1.0
       - run: stellar contract build
         working-directory: contracts/settlement
@@ -21,7 +21,7 @@ jobs:
           sha256sum setoff_settlement-*.wasm > SHA256SUMS
           cat SHA256SUMS
       # Compare with a deployment: `stellar contract fetch --id C… | sha256sum`.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             setoff_settlement-*.wasm
