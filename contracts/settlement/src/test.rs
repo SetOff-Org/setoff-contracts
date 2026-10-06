@@ -213,3 +213,20 @@ fn settlement_publishes_an_event() {
     w.contract.settle();
     assert!(!w.env.events().all().events().is_empty());
 }
+
+#[test]
+fn pausing_stops_new_risk_but_never_traps_funds() {
+    let w = World::new(2);
+    w.deposit(0, 100);
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 30, 1)]));
+    w.contract.pause();
+    assert!(w.contract.paused());
+    assert_eq!(w.contract.try_deposit(w.m(0), &w.usdc, &1).unwrap_err().unwrap(), code(Error::Paused));
+    assert_eq!(w.contract.try_submit(&w.batch(&[w.ob(0, 1, 1, 2)])).unwrap_err().unwrap(), code(Error::Paused));
+    // Available funds can still leave, and the open window can still settle.
+    w.contract.withdraw(w.m(0), &w.usdc, &70);
+    w.contract.settle();
+    assert_eq!(w.contract.balance(w.m(1), &w.usdc), 30);
+    w.contract.unpause();
+    w.deposit(0, 1);
+}

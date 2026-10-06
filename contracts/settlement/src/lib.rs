@@ -51,6 +51,8 @@ pub enum Error {
     BadBatch = 9,
     /// An amount overflowed.
     Overflow = 10,
+    /// The contract is paused: no deposits or new obligations.
+    Paused = 11,
 }
 
 /// One obligation in a `submit` batch.
@@ -73,6 +75,7 @@ pub struct Obligation {
 enum Key {
     Admin,
     Window,
+    Paused,
     Member(Address),
     Balance(Address, Address),
     Net(u64, Address, Address),
@@ -138,6 +141,14 @@ pub struct Obligated {
     pub window: u64,
 }
 
+/// The operator paused or resumed the contract.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PauseChanged {
+    /// Whether the contract is now paused.
+    pub paused: bool,
+}
+
 /// A window was settled.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -184,6 +195,12 @@ fn admin(env: &Env) -> Address {
     env.storage().instance().get(&Key::Admin).unwrap_or_else(|| panic_with_error!(env, Error::NotMember))
 }
 
+fn require_running(env: &Env) {
+    if env.storage().instance().get(&Key::Paused).unwrap_or(false) {
+        panic_with_error!(env, Error::Paused);
+    }
+}
+
 fn touch(env: &Env) {
     env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
 }
@@ -219,6 +236,7 @@ impl Settlement {
     /// Moves `amount` of `token` from the member into the contract as collateral.
     pub fn deposit(env: Env, member: Address, token: Address, amount: i128) {
         member.require_auth();
+        require_running(&env);
         require_member(&env, &member);
         if amount <= 0 {
             panic_with_error!(&env, Error::InvalidAmount);
@@ -255,6 +273,7 @@ impl Settlement {
     /// debtor's net debit must be covered by its balance; otherwise nothing
     /// is recorded. Returns the window the obligations joined.
     pub fn submit(env: Env, obligations: Vec<Obligation>) -> u64 {
+        require_running(&env);
         if obligations.is_empty() || obligations.len() > MAX_BATCH {
             panic_with_error!(&env, Error::BadBatch);
         }
@@ -353,6 +372,29 @@ impl Settlement {
         touch(&env);
         Settled { window: w, positions: applied }.publish(&env);
         w
+    }
+
+    /// Stops deposits and new obligations. Withdrawals of available funds and
+    /// settlement keep working, so members can always get their money out.
+    /// Operator only.
+    pub fn pause(env: Env) {
+        admin(&env).require_auth();
+        env.storage().instance().set(&Key::Paused, &true);
+        touch(&env);
+        PauseChanged { paused: true }.publish(&env);
+    }
+
+    /// Resumes normal operation. Operator only.
+    pub fn unpause(env: Env) {
+        admin(&env).require_auth();
+        env.storage().instance().set(&Key::Paused, &false);
+        touch(&env);
+        PauseChanged { paused: false }.publish(&env);
+    }
+
+    /// Whether the contract is paused.
+    pub fn paused(env: Env) -> bool {
+        env.storage().instance().get(&Key::Paused).unwrap_or(false)
     }
 
     /// The operator.
