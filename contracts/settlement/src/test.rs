@@ -445,3 +445,18 @@ fn a_minimum_amount_keeps_dust_out_of_the_window() {
     w.contract.submit(&w.batch(&[w.ob(0, 1, 100, 2)]));
     assert_eq!(w.contract.try_set_min_amount(&w.usdc, &-1).unwrap_err().unwrap(), code(Error::InvalidAmount));
 }
+
+#[test]
+fn used_references_can_be_looked_up() {
+    let w = World::new(2);
+    w.deposit(0, 10);
+    let o = w.ob(0, 1, 10, 7);
+    assert!(!w.contract.reference_used(w.m(0), &o.reference));
+    w.contract.submit(&w.batch(core::slice::from_ref(&o)));
+    assert!(w.contract.reference_used(w.m(0), &o.reference));
+    assert!(!w.contract.reference_used(w.m(1), &o.reference), "references are per debtor");
+    // The lookup survives settlement, as does the protection.
+    w.contract.settle();
+    assert!(w.contract.reference_used(w.m(0), &o.reference));
+    assert_eq!(w.contract.try_submit(&w.batch(&[o])).unwrap_err().unwrap(), code(Error::DuplicateReference));
+}

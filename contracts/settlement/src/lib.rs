@@ -728,6 +728,13 @@ impl Settlement {
         out
     }
 
+    /// Whether `debtor` has already used `reference`. A client that timed out
+    /// can check this before resubmitting; resubmitting is safe either way,
+    /// since a used reference is rejected.
+    pub fn reference_used(env: Env, debtor: Address, reference: BytesN<32>) -> bool {
+        env.storage().persistent().has(&Key::Reference(debtor, reference))
+    }
+
     /// Gross obligations in the open window for a token.
     pub fn gross(env: Env, token: Address) -> i128 {
         get_i128(&env, &Key::Gross(window(&env), token))
