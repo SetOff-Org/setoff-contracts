@@ -80,6 +80,8 @@ enum Key {
     Admin,
     PendingAdmin,
     Window,
+    WindowOpened,
+    MaxWindow,
     Paused,
     Member(Address),
     Balance(Address, Address),
@@ -253,6 +255,7 @@ impl Settlement {
     pub fn __constructor(env: Env, admin: Address) {
         env.storage().instance().set(&Key::Admin, &admin);
         env.storage().instance().set(&Key::Window, &0u64);
+        env.storage().instance().set(&Key::WindowOpened, &env.ledger().timestamp());
     }
 
     /// Admits a member. Operator only.
@@ -385,8 +388,16 @@ impl Settlement {
     /// Closes the open window: applies every net position to balances and opens the next window.
     ///
     /// Cannot fail for lack of funds: `submit` already guaranteed every net debit is covered.
+    /// The operator may settle at any time; once the window has been open for
+    /// `max_window` seconds (if set), anyone may, so a missing operator cannot
+    /// hold obligations hostage.
     pub fn settle(env: Env) -> u64 {
-        admin(&env).require_auth();
+        let opened: u64 = env.storage().instance().get(&Key::WindowOpened).unwrap_or(0);
+        let max: u64 = env.storage().instance().get(&Key::MaxWindow).unwrap_or(0);
+        let overdue = max > 0 && env.ledger().timestamp() >= opened.saturating_add(max);
+        if !overdue {
+            admin(&env).require_auth();
+        }
         let w = window(&env);
         let positions_key = Key::Positions(w);
         let positions: Vec<(Address, Address)> =
@@ -406,6 +417,7 @@ impl Settlement {
         env.storage().persistent().remove(&positions_key);
         let next = w.checked_add(1).unwrap_or_else(|| panic_with_error!(&env, Error::Overflow));
         env.storage().instance().set(&Key::Window, &next);
+        env.storage().instance().set(&Key::WindowOpened, &env.ledger().timestamp());
         touch(&env);
         Settled { window: w, positions: applied }.publish(&env);
         w
@@ -428,6 +440,21 @@ impl Settlement {
     /// Whether a token may be used for new deposits and obligations.
     pub fn token_allowed(env: Env, token: Address) -> bool {
         env.storage().persistent().get(&Key::Token(token)).unwrap_or(false)
+    }
+
+    /// Sets how long a window may stay open before anyone may settle it (0 disables). Operator only.
+    pub fn set_max_window(env: Env, seconds: u64) {
+        admin(&env).require_auth();
+        env.storage().instance().set(&Key::MaxWindow, &seconds);
+        touch(&env);
+    }
+
+    /// When the open window opened (unix seconds) and its maximum duration (0 if unset).
+    pub fn window_timing(env: Env) -> (u64, u64) {
+        (
+            env.storage().instance().get(&Key::WindowOpened).unwrap_or(0),
+            env.storage().instance().get(&Key::MaxWindow).unwrap_or(0),
+        )
     }
 
     /// Stops deposits and new obligations. Withdrawals of available funds and

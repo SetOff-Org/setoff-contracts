@@ -2,7 +2,7 @@
 
 extern crate std;
 
-use soroban_sdk::testutils::{Address as _, AuthorizedFunction, Events as _};
+use soroban_sdk::testutils::{Address as _, AuthorizedFunction, Events as _, Ledger as _};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{Address, BytesN, Env, Vec};
 
@@ -260,4 +260,31 @@ fn only_allowed_tokens_can_be_deposited_or_owed() {
     w.deposit(0, 50);
     w.contract.set_token(&w.usdc, &false);
     w.contract.withdraw(w.m(0), &w.usdc, &50);
+}
+
+#[test]
+fn anyone_may_settle_an_overdue_window() {
+    let w = World::new(2);
+    w.env.ledger().with_mut(|l| l.timestamp = 1_000);
+    w.contract.set_max_window(&3_600);
+    w.contract.settle(); // operator settles window 0; window 1 opens at t=1000
+    assert_eq!(w.contract.window_timing(), (1_000, 3_600));
+
+    w.deposit(0, 10);
+    w.contract.submit(&w.batch(&[w.ob(0, 1, 10, 1)]));
+    w.env.ledger().with_mut(|l| l.timestamp = 4_600);
+    w.contract.settle();
+    assert!(w.env.auths().is_empty(), "an overdue window needs no operator signature");
+    assert_eq!(w.contract.balance(w.m(1), &w.usdc), 10);
+}
+
+#[test]
+fn early_settlement_still_needs_the_operator() {
+    let w = World::new(1);
+    w.env.ledger().with_mut(|l| l.timestamp = 1_000);
+    w.contract.set_max_window(&3_600);
+    w.contract.settle();
+    w.env.ledger().with_mut(|l| l.timestamp = 2_000);
+    w.contract.settle();
+    assert_eq!(w.env.auths()[0].0, w.admin);
 }
