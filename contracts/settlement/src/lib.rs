@@ -53,6 +53,8 @@ pub enum Error {
     Overflow = 10,
     /// The contract is paused: no deposits or new obligations.
     Paused = 11,
+    /// No operator handover is pending.
+    NoPendingAdmin = 12,
 }
 
 /// One obligation in a `submit` batch.
@@ -74,6 +76,7 @@ pub struct Obligation {
 #[contracttype]
 enum Key {
     Admin,
+    PendingAdmin,
     Window,
     Paused,
     Member(Address),
@@ -139,6 +142,18 @@ pub struct Obligated {
     pub reference: BytesN<32>,
     /// Window it belongs to.
     pub window: u64,
+}
+
+/// The operator role changed hands.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminChanged {
+    /// Previous operator.
+    #[topic]
+    pub previous: Address,
+    /// New operator.
+    #[topic]
+    pub admin: Address,
 }
 
 /// The operator paused or resumed the contract.
@@ -395,6 +410,29 @@ impl Settlement {
     /// Whether the contract is paused.
     pub fn paused(env: Env) -> bool {
         env.storage().instance().get(&Key::Paused).unwrap_or(false)
+    }
+
+    /// Proposes a new operator. Takes effect only when the new operator calls
+    /// `accept_admin`, so a mistyped address can never lock the contract.
+    pub fn propose_admin(env: Env, new_admin: Address) {
+        admin(&env).require_auth();
+        env.storage().instance().set(&Key::PendingAdmin, &new_admin);
+        touch(&env);
+    }
+
+    /// Completes a handover proposed with `propose_admin`. The proposed operator only.
+    pub fn accept_admin(env: Env) {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&Key::PendingAdmin)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NoPendingAdmin));
+        pending.require_auth();
+        let previous = admin(&env);
+        env.storage().instance().set(&Key::Admin, &pending);
+        env.storage().instance().remove(&Key::PendingAdmin);
+        touch(&env);
+        AdminChanged { previous, admin: pending }.publish(&env);
     }
 
     /// The operator.

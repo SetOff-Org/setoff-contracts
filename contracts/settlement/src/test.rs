@@ -230,3 +230,16 @@ fn pausing_stops_new_risk_but_never_traps_funds() {
     w.contract.unpause();
     w.deposit(0, 1);
 }
+
+#[test]
+fn the_operator_role_changes_hands_in_two_steps() {
+    let w = World::new(1);
+    let next = Address::generate(&w.env);
+    assert_eq!(w.contract.try_accept_admin().unwrap_err().unwrap(), code(Error::NoPendingAdmin));
+    w.contract.propose_admin(&next);
+    assert_eq!(w.contract.admin(), w.admin, "nothing changes until the new operator accepts");
+    w.contract.accept_admin();
+    assert_eq!(w.env.auths()[0].0, next, "acceptance is signed by the new operator");
+    assert_eq!(w.contract.admin(), next);
+    assert_eq!(w.contract.try_accept_admin().unwrap_err().unwrap(), code(Error::NoPendingAdmin));
+}
