@@ -213,7 +213,12 @@ fn settlement_publishes_an_event() {
     w.deposit(0, 10);
     w.contract.submit(&w.batch(&[w.ob(0, 1, 10, 1)]));
     w.contract.settle();
-    assert!(!w.env.events().all().events().is_empty());
+    // The last event names the window as a topic and counts applied positions.
+    let (name, topics, data) = last_event(&w.env);
+    assert_eq!(name, "settled");
+    assert_eq!(topics, [soroban_sdk::xdr::ScVal::U64(0)]);
+    let soroban_sdk::xdr::ScVal::Map(Some(map)) = data else { panic!("data is not a map") };
+    assert!(map.iter().any(|e| e.val == soroban_sdk::xdr::ScVal::U32(2)), "two positions applied: {map:?}");
 }
 
 #[test]
