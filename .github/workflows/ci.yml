@@ -16,7 +16,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked
@@ -25,7 +25,7 @@ jobs:
   wasm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - uses: stellar/stellar-cli@v28.1.0
       - run: stellar contract build
@@ -33,14 +33,14 @@ jobs:
       - name: WASM size budget (64 KiB)
         run: test $(stat -c%s target/wasm32v1-none/release/setoff_settlement.wasm) -le 65536
       # The contract spec must stay consumable from TypeScript.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: TypeScript bindings generate and compile
         run: |
           stellar contract bindings typescript --wasm target/wasm32v1-none/release/setoff_settlement.wasm --output-dir bindings --overwrite
           cd bindings && npm install && npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: setoff_settlement.wasm
           path: target/wasm32v1-none/release/setoff_settlement.wasm
@@ -48,13 +48,13 @@ jobs:
   deny:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   hygiene:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: No stray working files
         run: |
           bad=$(git ls-files | grep -Ei '(^|/)(ISSUE_[0-9]+.*|.*_SUMMARY\.md|IMPLEMENTATION_.*|PR\.md|pr_body\.md|.*\.bak|.*\.orig)$' || true)
