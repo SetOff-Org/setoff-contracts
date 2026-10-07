@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-07
+
 ### Added
 
 - Netted settlement: collateral deposits, atomic obligation batches checked
@@ -33,4 +35,5 @@ All notable changes to this project are documented here. The format follows
   committed to the open window stayed locked. Windows now close permissionlessly
   after 7 days by default, and the bound cannot be unset.
 
-[Unreleased]: https://github.com/SetOff-Org/setoff-contracts/commits/main
+[Unreleased]: https://github.com/SetOff-Org/setoff-contracts/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/SetOff-Org/setoff-contracts/releases/tag/v0.1.0
