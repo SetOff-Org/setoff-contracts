@@ -42,6 +42,8 @@ deploys a fresh copy and replays this:
 | Settle: 30 XLM gross, every position 0, nothing moves | [`21925e89…b89c`](https://stellar.expert/explorer/testnet/tx/21925e89bb1b75861880fe836e0ee3e1048cb23439569b5ab3d326ce06f2b89c) |
 | A takes its collateral back with `withdraw_all` | [`9d335065…dac9`](https://stellar.expert/explorer/testnet/tx/9d335065463faec6b4374ff28455a4e1b3fef99364eb32d578855a814a65dac9) |
 
+Testnet is reset every few months, after which these links stop resolving; the script reproduces the whole run on a fresh network.
+
 ## Interface
 
 | Function | Who | What |
