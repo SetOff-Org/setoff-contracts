@@ -12,7 +12,7 @@ homepage = "https://github.com/SetOff-Org"
 authors = ["SetOff"]
 
 [workspace.dependencies]
-soroban-sdk = "28"
+soroban-sdk = "29"
 
 # Soroban contracts: small, with checked arithmetic even in release.
 [profile.release]
