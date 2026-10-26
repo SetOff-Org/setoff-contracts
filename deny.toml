@@ -11,6 +11,12 @@ ignore = [
   # through soroban-env-host, the native test host; the deployed WASM does not
   # contain it.
   { id = "RUSTSEC-2024-0436", reason = "build-time macro of the test host, absent from the contract" },
+  # `crypto-bigint` 0.5 has timing variability in constant-time operations,
+  # fixed only in 0.7.6. It is reached only through soroban-env-host's
+  # elliptic-curve 0.13, the native test host; `cargo tree -e normal --target
+  # wasm32v1-none -i crypto-bigint` shows the deployed WASM does not contain
+  # it, and soroban-sdk 29 still uses 0.5. Remove once soroban moves to 0.7.
+  { id = "RUSTSEC-2026-0387", reason = "test host only (elliptic-curve 0.13), absent from the contract; no 0.5.x fix exists" },
 ]
 
 [licenses]
