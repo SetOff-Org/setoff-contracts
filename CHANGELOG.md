@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-28
+
+### Changed
+
+- soroban-sdk 29 (from 28), current with protocol 29 on mainnet and testnet.
+
+### Security
+
+- RUSTSEC-2026-0387 (`crypto-bigint` 0.5) is reached only through the native
+  test host. `cargo tree -e normal --target wasm32v1-none` shows the deployed
+  contract doesn't contain it, so `deny.toml` ignores it with that reason
+  until soroban moves to 0.7.
+
 ## [0.1.0] - 2026-10-07
 
 ### Added
@@ -35,5 +48,6 @@ All notable changes to this project are documented here. The format follows
   committed to the open window stayed locked. Windows now close permissionlessly
   after 7 days by default, and the bound cannot be unset.
 
-[Unreleased]: https://github.com/SetOff-Org/setoff-contracts/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/SetOff-Org/setoff-contracts/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/SetOff-Org/setoff-contracts/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/SetOff-Org/setoff-contracts/releases/tag/v0.1.0
