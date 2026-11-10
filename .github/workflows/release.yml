@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: stellar/stellar-cli@v28.1.0
+      - uses: stellar/stellar-cli@v30.0.1
       - run: stellar contract build
         working-directory: contracts/settlement
       - name: Name and hash the build
