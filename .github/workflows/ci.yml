@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
-      - uses: stellar/stellar-cli@v28.1.0
+      - uses: stellar/stellar-cli@v30.0.1
       - run: stellar contract build
         working-directory: contracts/settlement
       - name: WASM size budget (64 KiB)
